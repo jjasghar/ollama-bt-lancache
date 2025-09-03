@@ -1,0 +1,91 @@
+# Binaries and executables
+*.exe
+*.dll
+*.so
+*.dylib
+main
+tracker
+server/main
+tracker/tracker
+tracker/privtracker/tracker
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+*.pid
+*.lock
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Ollama models and torrents (user data)
+~/.ollama/
+.ollama/
+models/
+*.torrent
+
+# Test files
+test_*
+*_test.py
+test/
+tests/
+
+# Configuration files with sensitive data
+config.yaml
+.env
+.env.local
+.env.production
+
+# Build artifacts
+*.o
+*.a
+*.out

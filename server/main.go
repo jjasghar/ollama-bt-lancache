@@ -1008,14 +1008,7 @@ Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" | Invoke-Exp
 curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --model granite3.3:8b</div>
             </div>
             
-            <div class="script-section">
-                <div class="script-title">🧪 Test Mode (Download to Current Directory)</div>
-                <div class="script-code"># Windows (PowerShell)
-Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" | Invoke-Expression -ArgumentList "-Test -Model phi3:mini"
 
-# Linux/macOS (Bash)
-curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --test --model phi3:mini</div>
-            </div>
             
             <div class="script-section">
                 <div class="script-title">🧹 Clean Up Virtual Environment</div>
@@ -1033,7 +1026,6 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" -OutFile "install.ps1"
 .\install.ps1 -List                    # List models
 .\install.ps1 -Model granite3.3:8b    # Download specific model
-.\install.ps1 -Test -Model phi3:mini  # Test mode
 .\install.ps1 -Clean                  # Clean up
 
 # Linux/macOS (Bash)
@@ -1041,7 +1033,6 @@ curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" -o install.sh
 chmod +x install.sh
 ./install.sh --list                    # List models
 ./install.sh --model granite3.3:8b    # Download specific model
-./install.sh --test --model phi3:mini # Test mode
 ./install.sh --clean                   # Clean up</div>
             </div>
         </div>
