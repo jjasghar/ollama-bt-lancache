@@ -30,20 +30,29 @@ class OllamaSeeder:
         self.tracker_url = tracker_url or "http://localhost:8080"
         self.session = lt.session()
         
-        # Configure session
-        self.session.listen_on(6881, 6891)
+        # Configure session settings
+        settings = {
+            'listen_interfaces': '0.0.0.0:6881',
+            'enable_dht': False,  # Disable DHT for private trackers
+            'enable_lsd': True,
+            'enable_upnp': True,
+            'enable_natpmp': True,
+            'announce_to_all_trackers': True,
+            'announce_to_all_tiers': True,
+        }
+        self.session.apply_settings(settings)
         
-        # Add DHT routers
-        self.session.add_dht_router("router.bittorrent.com", 6881)
-        self.session.add_dht_router("router.utorrent.com", 6881)
-        
-        # Add tracker if specified
-        if tracker_url:
-            self.session.add_tracker(lt.announce_entry(tracker_url))
+        # Add DHT routers (for public torrents)
+        try:
+            self.session.add_dht_router("router.bittorrent.com", 6881)
+            self.session.add_dht_router("router.utorrent.com", 6881)
+        except AttributeError:
+            # DHT routers are automatically configured in newer versions
+            pass
         
         print(f"🚀 Initialized BitTorrent client")
         if tracker_url:
-            print(f"📡 Using tracker: {tracker_url}")
+            print(f"📡 Tracker URL will be read from torrent file: {tracker_url}")
     
     def seed_torrent_file(self, torrent_file):
         """Seed a torrent file directly"""
@@ -67,15 +76,35 @@ class OllamaSeeder:
             num_files = info.num_files()
             print(f"📄 Number of files: {num_files}")
             
-            # Get tracker URLs
-            trackers = info.trackers()
+            # Print tracker information
+            trackers = list(info.trackers())
             if trackers:
-                print(f"📡 Trackers: {', '.join([t.url for t in trackers])}")
+                print(f"📡 Found {len(trackers)} tracker(s):")
+                for tracker in trackers:
+                    print(f"   - {tracker.url}")
+            else:
+                print("⚠️  No trackers found in torrent file")
             
             # Add torrent to session
+            # Handle both old format (model name) and new format ("models") torrents
+            models_dir = os.path.dirname(os.path.abspath(torrent_file))  # This is /Users/jjasghar/.ollama/models
+            
+            if torrent_name == "models":
+                # New format: torrent name is "models", files are in save_path/models/
+                save_path = os.path.dirname(models_dir)  # This is /Users/jjasghar/.ollama
+                print(f"🔍 Torrent name: {torrent_name} (new format)")
+                print(f"🔍 Save path: {save_path}")
+                print(f"🔍 Looking for files in: {save_path}/models/")
+            else:
+                # Old format: torrent name is model name, files are directly in models/
+                save_path = models_dir  # This is /Users/jjasghar/.ollama/models
+                print(f"🔍 Torrent name: {torrent_name} (old format)")
+                print(f"🔍 Save path: {save_path}")
+                print(f"🔍 Looking for files in: {save_path}/")
+            
             h = self.session.add_torrent({
                 'ti': info,
-                'save_path': os.path.dirname(os.path.abspath(torrent_file))
+                'save_path': save_path
             })
             
             print(f"🌱 Started seeding: {torrent_name}")
@@ -92,8 +121,14 @@ class OllamaSeeder:
                 seeds = s.num_seeds
                 leeches = s.num_connections
                 
+                # Debug: Show torrent state
+                state = h.status().state
+                progress = h.status().progress * 100
+                is_seed = h.is_seed()
+                
                 print(f"\r🌱 Seeding: {s.upload_rate/1024:.1f} KB/s | "
                       f"Peers: {peers} | Seeds: {seeds} | Connections: {leeches} | "
+                      f"Progress: {progress:.1f}% | State: {state} | IsSeed: {is_seed} | "
                       f"Uptime: {elapsed:.0f}s", end='', flush=True)
                 
                 time.sleep(1)
@@ -126,11 +161,19 @@ class OllamaSeeder:
             lt.add_files(fs, model_path)
             
             t = lt.create_torrent(fs)
-            t.add_tracker(self.tracker_url)
+            try:
+                t.add_tracker(self.tracker_url)
+            except AttributeError:
+                # Some libtorrent versions handle trackers differently
+                pass
             t.set_creator("ollama-bt-lancache")
             
-            # Set piece size to 1MB
-            t.set_piece_length(1024 * 1024)
+            # Set piece size to 1MB (compatibility check)
+            try:
+                t.set_piece_length(1024 * 1024)
+            except AttributeError:
+                # Some libtorrent versions don't have set_piece_length
+                pass
             
             # Calculate hashes
             print("📊 Calculating file hashes...")
@@ -146,6 +189,27 @@ class OllamaSeeder:
             print(f"❌ Error creating torrent: {e}")
             return False
     
+    def handle_model(self, server_url, model_name):
+        """Handle a model - seed if exists locally, otherwise download"""
+        # Check if model exists locally in the standard Ollama models directory
+        models_dir = os.path.expanduser("~/.ollama/models")
+        
+        # Check if the models directory exists and has the model files
+        if os.path.exists(models_dir):
+            # Check if we have the blobs and manifests directories (indicating models are present)
+            blobs_dir = os.path.join(models_dir, "blobs")
+            manifests_dir = os.path.join(models_dir, "manifests")
+            
+            if os.path.exists(blobs_dir) and os.path.exists(manifests_dir):
+                print(f"✅ Found existing Ollama models in {models_dir}")
+                print(f"🌱 Seeding existing models directory...")
+                self.seed_model(models_dir)
+                return
+        
+        # If no local models found, download from server
+        print(f"📥 No local models found, downloading {model_name} from server...")
+        self.download_model(server_url, model_name)
+
     def download_model(self, server_url, model_name, download_all=False):
         """Download a specific model or all models"""
         models = self.get_available_models(server_url)
@@ -210,7 +274,7 @@ class OllamaSeeder:
             except Exception as e:
                 print(f"❌ Error downloading {model['name']}: {e}")
     
-    def seed_model(self, model_path):
+    def seed_model(self, model_path, torrent_file=None):
         """Seed a local model directory"""
         if not os.path.exists(model_path):
             print(f"❌ Model path does not exist: {model_path}")
@@ -218,12 +282,16 @@ class OllamaSeeder:
         
         print(f"🌱 Seeding model: {model_path}")
         
-        torrent_path = f"{model_path}.torrent"
+        # Use the torrent file passed as parameter, or look for models.torrent
+        if torrent_file and os.path.exists(torrent_file):
+            torrent_path = torrent_file
+        else:
+            torrent_path = os.path.join(model_path, "models.torrent")
         
         if not os.path.exists(torrent_path):
-            print(f"🔨 Creating torrent file for: {model_path}")
-            if not self.create_torrent(model_path, torrent_path):
-                return
+            print(f"❌ Torrent file not found: {torrent_path}")
+            print(f"💡 Make sure the server has created the torrent file")
+            return
         
         try:
             info = lt.torrent_info(torrent_path)
@@ -362,7 +430,8 @@ Examples:
         elif args.model:
             if not args.server:
                 parser.error("--server is required with --model")
-            seeder.download_model(args.server, args.model)
+            # Check if model already exists locally, if so seed it, otherwise download
+            seeder.handle_model(args.server, args.model)
         
     except KeyboardInterrupt:
         print("\n🛑 Operation cancelled by user")

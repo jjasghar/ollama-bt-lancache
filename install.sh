@@ -4,8 +4,11 @@
 set -e
 
 # Default values
-MODEL=${1:-"all"}
-SERVER_URL=${2:-"http://localhost:8080"}
+MODEL=""
+SERVER_URL=""
+TEST_MODE=false
+CLEAN_MODE=false
+SHOW_MODELS=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -36,6 +39,72 @@ print_success() {
     echo -e "${GREEN}✅ $1${NC}"
 }
 
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo
+    echo "Options:"
+    echo "  --model MODEL     Download specific model (e.g., granite3.3:8b)"
+    echo "  --server URL      Server URL (default: http://10.37.254.211:8080)"
+    echo "  --test            Download to current directory instead of ~/.ollama/models"
+    echo "  --clean           Remove virtual environment and exit"
+    echo "  --list            List available models from server"
+    echo "  -h, --help        Show this help message"
+    echo
+    echo "Examples:"
+    echo "  $0 --list                                    # List available models"
+    echo "  $0 --model granite3.3:8b                    # Download specific model"
+    echo "  $0 --model phi3:mini --server http://192.168.1.100:8080  # Download from specific server"
+    echo "  $0 --test --model granite3.3:8b             # Download to current directory"
+    echo "  $0 --clean                                   # Remove virtual environment"
+    echo
+    echo "One-liner examples:"
+    echo "  curl -sSL \"http://192.168.1.100:8080/install.sh\" | bash -s -- --model granite3.3:8b"
+    echo "  curl -sSL \"http://192.168.1.100:8080/install.sh\" | bash -s -- --list"
+}
+
+# Function to parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --model)
+                MODEL="$2"
+                shift 2
+                ;;
+            --server)
+                SERVER_URL="$2"
+                shift 2
+                ;;
+            --test)
+                TEST_MODE=true
+                shift
+                ;;
+            --clean)
+                CLEAN_MODE=true
+                shift
+                ;;
+            --list)
+                SHOW_MODELS=true
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set defaults if not provided
+    if [ -z "$SERVER_URL" ]; then
+        SERVER_URL="http://10.37.254.211:8080"
+    fi
+}
+
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -60,32 +129,99 @@ install_python_deps() {
         if command_exists apt-get; then
             print_info "Installing system dependencies (Ubuntu/Debian)..."
             sudo apt-get update
-            sudo apt-get install -y python3-venv python3-pip
+            sudo apt-get install -y python3-venv python3-pip curl
         elif command_exists yum; then
             print_info "Installing system dependencies (CentOS/RHEL)..."
-            sudo yum install -y python3 python3-pip python3-venv
+            sudo yum install -y python3 python3-pip python3-venv curl
         elif command_exists dnf; then
             print_info "Installing system dependencies (Fedora)..."
-            sudo dnf install -y python3 python3-pip python3-venv
+            sudo dnf install -y python3 python3-pip python3-venv curl
         else
-            print_warning "Could not detect package manager. Please install Python 3.8+ manually."
+            print_warning "Could not detect package manager. Please install Python 3.8+ and curl manually."
         fi
     elif [[ "$os" == "macos" ]]; then
         if command_exists brew; then
             print_info "Installing system dependencies (macOS with Homebrew)..."
-            brew install python3
+            brew install python3 curl
         else
-            print_warning "Homebrew not found. Please install Python 3.8+ manually from https://python.org"
+            print_warning "Homebrew not found. Please install Python 3.8+ and curl manually."
         fi
     fi
 }
 
-# Main installation function
-main() {
-    print_status "Installing Ollama BitTorrent Lancache..."
-    print_info "Server: $SERVER_URL"
-    print_info "Model: $MODEL"
+# Function to list available models
+list_models() {
+    print_info "Fetching available models from $SERVER_URL..."
     
+    if ! command_exists curl; then
+        print_error "curl is required to fetch model list"
+        print_info "Attempting to install curl..."
+        install_python_deps
+        if ! command_exists curl; then
+            print_error "Failed to install curl. Please install it manually."
+            exit 1
+        fi
+    fi
+    
+    # Fetch models from server
+    MODELS_JSON=$(curl -s "$SERVER_URL/api/models" 2>/dev/null)
+    
+    if [ $? -ne 0 ] || [ -z "$MODELS_JSON" ]; then
+        print_error "Failed to fetch models from server: $SERVER_URL"
+        print_info "Make sure the server is running and accessible"
+        exit 1
+    fi
+    
+    # Parse and display models
+    echo
+    print_success "Available Models:"
+    echo "----------------------------------------"
+    
+    echo "$MODELS_JSON" | python3 -c "
+import sys, json
+try:
+    models = json.load(sys.stdin)
+    if not models:
+        print('No models available on server')
+    else:
+        for model in models:
+            size_mb = model['size'] / (1024 * 1024)
+            print(f'📁 {model[\"name\"]:<25} {size_mb:>8.1f} MB')
+except Exception as e:
+    print(f'Error parsing models: {e}')
+    sys.exit(1)
+"
+    
+    echo "----------------------------------------"
+    echo
+    print_info "To download a model, use:"
+    print_info "  $0 --model <model-name>"
+    print_info "  curl -sSL \"$SERVER_URL/install.sh\" | bash -- --model <model-name>"
+}
+
+# Function to clean virtual environment
+clean_venv() {
+    VENV_PATH="$HOME/.ollama-bt-venv"
+    
+    if [ -d "$VENV_PATH" ]; then
+        print_info "Removing virtual environment at $VENV_PATH..."
+        rm -rf "$VENV_PATH"
+        print_success "Virtual environment removed"
+    else
+        print_info "No virtual environment found at $VENV_PATH"
+    fi
+    
+    # Also remove seeder script if it exists
+    SEEDER_PATH="$HOME/seeder.py"
+    if [ -f "$SEEDER_PATH" ]; then
+        print_info "Removing seeder script at $SEEDER_PATH..."
+        rm -f "$SEEDER_PATH"
+        print_success "Seeder script removed"
+    fi
+}
+
+# Function to setup virtual environment
+setup_venv() {
     # Check if Python is installed
     if ! command_exists python3; then
         print_error "Python 3 not found"
@@ -132,73 +268,107 @@ main() {
     print_info "Installing required packages..."
     pip install --upgrade pip
     pip install libtorrent requests
+}
+
+# Function to download client script
+download_client() {
+    CLIENT_URL="$SERVER_URL/client.py"
+    CLIENT_PATH="$HOME/client.py"
+    print_info "Downloading client script..."
     
-    # Download seeder script
-    SEEDER_URL="$SERVER_URL/seeder.py"
-    SEEDER_PATH="$HOME/seeder.py"
-    print_info "Downloading seeder script..."
-    
-    if curl -sSL "$SEEDER_URL" -o "$SEEDER_PATH"; then
-        print_success "Downloaded seeder script to: $SEEDER_PATH"
-        chmod +x "$SEEDER_PATH"
+    if curl -sSL "$CLIENT_URL" -o "$CLIENT_PATH"; then
+        print_success "Downloaded client script to: $CLIENT_PATH"
+        chmod +x "$CLIENT_PATH"
     else
-        print_error "Failed to download seeder script"
+        print_error "Failed to download client script"
+        exit 1
+    fi
+}
+
+# Function to download model
+download_model() {
+    if [ -z "$MODEL" ]; then
+        print_error "No model specified. Use --list to see available models or --model <name> to download"
         exit 1
     fi
     
-    # Create Ollama models directory if it doesn't exist
-    OLLAMA_DIR="$HOME/.ollama/models"
-    if [ ! -d "$OLLAMA_DIR" ]; then
-        print_info "Creating Ollama models directory..."
-        mkdir -p "$OLLAMA_DIR"
-    fi
-    
-    # Download models based on parameter
-    print_status "Starting model download..."
-    
-    if [ "$MODEL" = "all" ]; then
-        print_info "Downloading all available models..."
-        python3 "$SEEDER_PATH" --server "$SERVER_URL" --download-all
+    # Determine output directory
+    if [ "$TEST_MODE" = true ]; then
+        OUTPUT_DIR="$(pwd)/downloads"
+        print_info "Test mode: downloading to $OUTPUT_DIR"
     else
-        print_info "Downloading model: $MODEL"
-        python3 "$SEEDER_PATH" --server "$SERVER_URL" --model "$MODEL"
+        OUTPUT_DIR="$HOME/.ollama/models"
+        print_info "Downloading to Ollama directory: $OUTPUT_DIR"
     fi
+    
+    # Create output directory
+    mkdir -p "$OUTPUT_DIR"
+    
+    # Download model using client script
+    print_status "Starting model download..."
+    print_info "Model: $MODEL"
+    print_info "Server: $SERVER_URL"
+    print_info "Output: $OUTPUT_DIR"
+    
+    CLIENT_PATH="$HOME/client.py"
+    if [ ! -f "$CLIENT_PATH" ]; then
+        print_error "Client script not found. Please run setup first."
+        exit 1
+    fi
+    
+    # Activate virtual environment
+    source "$HOME/.ollama-bt-venv/bin/activate"
+    
+    # Download the model
+    python3 "$CLIENT_PATH" --server "$SERVER_URL" --model "$MODEL" --output "$OUTPUT_DIR"
     
     if [ $? -eq 0 ]; then
-        print_success "Installation complete!"
-        print_info "Models downloaded to: $OLLAMA_DIR"
+        print_success "Model download complete!"
+        print_info "Model downloaded to: $OUTPUT_DIR"
         
-        echo
-        print_info "📋 Next steps:"
-        echo -e "${WHITE}1. Install Ollama from https://ollama.ai if not already installed${NC}"
-        echo -e "${WHITE}2. Use 'ollama run <model-name>' to start using your models${NC}"
-        echo -e "${WHITE}3. To seed models for other clients, run: python3 $SEEDER_PATH --seed <model-path>${NC}"
+        if [ "$TEST_MODE" = false ]; then
+            echo
+            print_info "📋 Next steps:"
+            echo -e "${WHITE}1. Install Ollama from https://ollama.ai if not already installed${NC}"
+            echo -e "${WHITE}2. Use 'ollama run $MODEL' to start using your model${NC}"
+        fi
     else
-        print_error "Installation failed"
+        print_error "Model download failed"
         exit 1
     fi
 }
 
-# Function to show usage
-show_usage() {
-    echo "Usage: $0 [MODEL] [SERVER_URL]"
-    echo
-    echo "Arguments:"
-    echo "  MODEL       Model name to download (default: all)"
-    echo "  SERVER_URL  Server URL (default: http://localhost:8080)"
-    echo
-    echo "Examples:"
-    echo "  $0                                    # Download all models from localhost:8080"
-    echo "  $0 llama2:7b                         # Download specific model from localhost:8080"
-    echo "  $0 all http://192.168.1.100:8080    # Download all models from specific server"
-    echo "  $0 llama2:7b http://192.168.1.100:8080  # Download specific model from specific server"
+# Main function
+main() {
+    parse_args "$@"
+    
+    # Handle special modes
+    if [ "$CLEAN_MODE" = true ]; then
+        clean_venv
+        exit 0
+    fi
+    
+    if [ "$SHOW_MODELS" = true ]; then
+        list_models
+        exit 0
+    fi
+    
+    # If no model specified, show available models
+    if [ -z "$MODEL" ]; then
+        print_warning "No model specified. Showing available models..."
+        list_models
+        exit 0
+    fi
+    
+    # Setup environment and download model
+    print_status "Installing Ollama BitTorrent Lancache..."
+    print_info "Server: $SERVER_URL"
+    print_info "Model: $MODEL"
+    
+    setup_venv
+    download_client
+    download_model
 }
-
-# Check if help is requested
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    show_usage
-    exit 0
-fi
 
 # Run main function
 main "$@"
