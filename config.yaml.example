@@ -1,0 +1,39 @@
+# Ollama BitTorrent Lancache Configuration
+# Copy this file to ~/.ollama-bt-lancache.yaml and modify as needed
+
+# Server configuration
+server:
+  port: 8080
+  host: "0.0.0.0"  # Listen on all interfaces
+  
+# BitTorrent tracker configuration
+tracker:
+  url: "http://localhost:8080"  # Tracker URL
+  port: 8080
+  
+# Models directory (auto-detected if not specified)
+models_dir: "~/.ollama/models"
+
+# Logging configuration
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "text"  # text, json
+  
+# BitTorrent settings
+bittorrent:
+  piece_size: 1048576  # 1MB piece size
+  upload_limit: 0      # 0 = unlimited
+  download_limit: 0    # 0 = unlimited
+  max_connections: 200
+  max_uploads: 10
+  
+# Web interface customization
+web:
+  title: "Ollama BitTorrent Lancache"
+  theme: "default"  # default, dark, light
+  
+# Security settings
+security:
+  enable_auth: false
+  allowed_ips: []  # Empty array = allow all
+  rate_limit: 1000  # Requests per minute per IP
