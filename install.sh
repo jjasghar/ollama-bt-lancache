@@ -45,7 +45,7 @@ show_usage() {
     echo
     echo "Options:"
     echo "  --model MODEL     Download specific model (e.g., granite3.3:8b)"
-    echo "  --server URL      Server URL (default: http://10.37.254.211:8080)"
+    echo "  --server URL      Server URL (default: http://localhost:8080)"
     echo "  --test            Download to current directory instead of ~/.ollama/models"
     echo "  --clean           Remove virtual environment and exit"
     echo "  --list            List available models from server"
@@ -101,7 +101,7 @@ parse_args() {
     
     # Set defaults if not provided
     if [ -z "$SERVER_URL" ]; then
-        SERVER_URL="http://10.37.254.211:8080"
+        SERVER_URL="http://localhost:8080"
     fi
 }
 

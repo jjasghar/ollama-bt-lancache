@@ -776,7 +776,30 @@ func (s *Server) servePowerShellScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	w.Write(content)
+	// Replace all server URL references with actual server IP
+	scriptContent := string(content)
+	serverURL := fmt.Sprintf("http://%s:%s", s.serverIP, s.port)
+	
+	// Replace various patterns of server URLs
+	scriptContent = strings.ReplaceAll(scriptContent, "http://localhost:8080", serverURL)
+	scriptContent = strings.ReplaceAll(scriptContent, "localhost:8080", fmt.Sprintf("%s:%s", s.serverIP, s.port))
+	scriptContent = strings.ReplaceAll(scriptContent, `$Server = "http://localhost:8080"`, fmt.Sprintf(`$Server = "%s"`, serverURL))
+	scriptContent = strings.ReplaceAll(scriptContent, `(default: http://localhost:8080)`, fmt.Sprintf(`(default: %s)`, serverURL))
+	
+	// Replace hardcoded IP addresses with dynamic server IP
+	scriptContent = strings.ReplaceAll(scriptContent, `$Server = "http://10.37.254.211:8080"`, fmt.Sprintf(`$Server = "%s"`, serverURL))
+	scriptContent = strings.ReplaceAll(scriptContent, `(default: http://10.37.254.211:8080)`, fmt.Sprintf(`(default: %s)`, serverURL))
+	
+	// Replace any other hardcoded IP patterns
+	re := strings.NewReplacer(
+		`http://10.37.254.211:8080`, serverURL,
+		`http://192.168.1.100:8080`, serverURL,
+		`http://172.20.10.209:8080`, serverURL,
+		`192.168.1.100:8080`, fmt.Sprintf("%s:%s", s.serverIP, s.port),
+	)
+	scriptContent = re.Replace(scriptContent)
+	
+	w.Write([]byte(scriptContent))
 }
 
 func (s *Server) serveBashScript(w http.ResponseWriter, r *http.Request) {
@@ -794,13 +817,30 @@ func (s *Server) serveBashScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Replace localhost references with actual server IP
+	// Replace all server URL references with actual server IP
 	scriptContent := string(content)
 	serverURL := fmt.Sprintf("http://%s:%s", s.serverIP, s.port)
+	
+	// Replace various patterns of server URLs
 	scriptContent = strings.ReplaceAll(scriptContent, "http://localhost:8080", serverURL)
 	scriptContent = strings.ReplaceAll(scriptContent, "localhost:8080", fmt.Sprintf("%s:%s", s.serverIP, s.port))
 	scriptContent = strings.ReplaceAll(scriptContent, `SERVER_URL="http://localhost:8080"`, fmt.Sprintf(`SERVER_URL="%s"`, serverURL))
 	scriptContent = strings.ReplaceAll(scriptContent, `(default: http://localhost:8080)`, fmt.Sprintf(`(default: %s)`, serverURL))
+	
+	// Replace hardcoded IP addresses with dynamic server IP
+	// This handles cases where the script has a hardcoded IP like "http://10.37.254.211:8080"
+	scriptContent = strings.ReplaceAll(scriptContent, `SERVER_URL="http://10.37.254.211:8080"`, fmt.Sprintf(`SERVER_URL="%s"`, serverURL))
+	scriptContent = strings.ReplaceAll(scriptContent, `(default: http://10.37.254.211:8080)`, fmt.Sprintf(`(default: %s)`, serverURL))
+	
+	// Replace any other hardcoded IP patterns (more flexible approach)
+	// This regex-like replacement handles various IP patterns
+	re := strings.NewReplacer(
+		`http://10.37.254.211:8080`, serverURL,
+		`http://192.168.1.100:8080`, serverURL,
+		`http://172.20.10.209:8080`, serverURL,
+		`192.168.1.100:8080`, fmt.Sprintf("%s:%s", s.serverIP, s.port),
+	)
+	scriptContent = re.Replace(scriptContent)
 	
 	w.Write([]byte(scriptContent))
 }
