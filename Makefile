@@ -17,7 +17,7 @@ help:
 # Build the Go server application
 build:
 	@echo "Building Go server application..."
-	cd server && go build -o ollama-bt-lancache
+	go build -o server/ollama-bt-lancache ./server
 	@echo "✅ Build complete: server/ollama-bt-lancache"
 
 # Clean build artifacts
@@ -29,7 +29,7 @@ clean:
 # Install Go dependencies
 install-deps:
 	@echo "Installing Go dependencies..."
-	cd server && go mod download
+	go mod download
 	@echo "✅ Dependencies installed"
 
 # Setup the BitTorrent tracker
@@ -61,7 +61,7 @@ run-server: build
 	@echo "Starting Ollama BitTorrent Lancache server..."
 	@echo "Server will be available at: http://localhost:8080"
 	@echo "Press Ctrl+C to stop"
-	cd server && ./ollama-bt-lancache
+	./server/ollama-bt-lancache
 
 # Run the BitTorrent tracker
 run-tracker: setup-tracker
@@ -73,7 +73,7 @@ run-tracker: setup-tracker
 # Run tests
 test:
 	@echo "Running tests..."
-	cd server && go test ./...
+	go test ./...
 	@echo "✅ Tests complete"
 
 # Build and setup everything
@@ -85,10 +85,10 @@ dev-server: build
 	@echo "Starting development server with auto-reload..."
 	@echo "Note: Install 'air' for auto-reload: go install github.com/cosmtrek/air@latest"
 	@if command -v air >/dev/null 2>&1; then \
-		cd server && air; \
+		air; \
 	else \
 		echo "Air not found. Starting without auto-reload..."; \
-		cd server && ./ollama-bt-lancache; \
+		./server/ollama-bt-lancache; \
 	fi
 
 # Docker helpers (if you want to containerize later)
@@ -111,14 +111,14 @@ check-deps:
 lint:
 	@echo "Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		cd server && golangci-lint run; \
+		golangci-lint run; \
 	else \
 		echo "golangci-lint not found. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
 format:
 	@echo "Formatting Go code..."
-	cd server && go fmt ./...
+	go fmt ./...
 	@echo "✅ Code formatted"
 
 # Show project status
@@ -126,4 +126,4 @@ status:
 	@echo "Project Status:"
 	@echo "  Go server: $(shell if [ -f server/ollama-bt-lancache ]; then echo "✅ Built"; else echo "❌ Not built"; fi)"
 	@echo "  Tracker: $(shell if [ -f tracker/tracker ]; then echo "✅ Ready"; else echo "❌ Not ready"; fi)"
-	@echo "  Dependencies: $(shell if [ -d server/vendor ] || [ -f server/go.sum ]; then echo "✅ Installed"; else echo "❌ Not installed"; fi)"
+	@echo "  Dependencies: $(shell if [ -f go.sum ]; then echo "✅ Installed"; else echo "❌ Not installed"; fi)"

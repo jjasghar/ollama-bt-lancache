@@ -4,7 +4,6 @@
 *.so
 *.dylib
 main
-tracker
 server/main
 tracker/tracker
 tracker/privtracker/tracker

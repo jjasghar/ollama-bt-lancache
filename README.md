@@ -16,6 +16,8 @@ Ollama BitTorrent Lancache transforms the traditional point-to-point model distr
 - **⚡ Horizontal Scaling**: Multiple seeds per model for faster downloads
 - **🎛️ Individual Model Torrents**: Each model gets its own optimized torrent file
 - **🌱 Auto-Seeding Clients**: Clients automatically become seeders after download
+- **🌐 Dynamic IP Detection**: Server automatically detects and uses local IP for all services
+- **📋 Smart Install Scripts**: Install scripts dynamically adapt to server IP address
 
 ## 🏗️ Architecture
 
@@ -46,9 +48,10 @@ Ollama BitTorrent Lancache transforms the traditional point-to-point model distr
 
 ### Prerequisites
 
-- **Go 1.19+** (for server and tracker)
+- **Go 1.21+** (for server and tracker)
 - **Python 3.8+** (for client scripts)
 - **Ollama** with models in `~/.ollama/models`
+- **Git** (for cloning the private tracker)
 
 ### 1. Clone and Setup
 
@@ -59,19 +62,36 @@ cd ollama-bt-lancache
 # Create Python virtual environment
 python3 -m venv venv
 source venv/bin/activate
-pip install libtorrent requests
+pip install -r requirements.txt
 
-# Build the server and tracker
-cd server
-go mod tidy
-go build -o ollama-bt-lancache
-cd ../tracker/privtracker
-go mod tidy
+# Build everything using Make
+make all
+```
+
+### 2. Alternative Manual Setup
+
+If you prefer manual setup or need to troubleshoot:
+
+```bash
+# Install Go dependencies
+make install-deps
+
+# Build the server
+make build
+
+# Setup the BitTorrent tracker
+make setup-tracker-auto
+
+# Or manually setup tracker:
+cd tracker
+git clone https://github.com/meehow/privtracker.git
+cd privtracker
 go build -o tracker
+cp tracker ../
 cd ../..
 ```
 
-### 2. Start the System
+### 3. Start the System
 
 ```bash
 # Start everything with one command
@@ -79,13 +99,17 @@ cd ../..
 ```
 
 This will start:
-- **BitTorrent Tracker** on port 8081
+- **BitTorrent Tracker** on port 8081 (using meehow/privtracker)
 - **Web Server** on port 8080 (with dynamic IP detection)
 - **Auto Seeder** for all existing models
 
-The system will automatically detect your local IP and use it for all services.
+The system will automatically:
+- Detect your local IP address
+- Use it for all services and install scripts
+- Create individual torrent files for each model
+- Start seeding all available models
 
-### 3. Stop the System
+### 4. Stop the System
 
 ```bash
 # Stop all services (preserve torrent files)
@@ -95,7 +119,7 @@ The system will automatically detect your local IP and use it for all services.
 ./stop_system.sh --clean
 ```
 
-### 4. Access the Web Interface
+### 5. Access the Web Interface
 
 Open your browser to `http://YOUR_IP:8080` to:
 - Browse available models
@@ -129,6 +153,35 @@ Example models:
 
 # Stop everything and clean up torrent files
 ./stop_system.sh --clean
+```
+
+### Make Commands
+
+The project includes a comprehensive Makefile for development and deployment:
+
+```bash
+# Show all available commands
+make help
+
+# Build everything (recommended for first setup)
+make all
+
+# Individual build steps
+make install-deps    # Install Go dependencies
+make build          # Build the Go server
+make setup-tracker  # Setup BitTorrent tracker
+make setup-tracker-auto  # Auto-setup tracker (clones and builds)
+
+# Development
+make dev-server     # Start server with auto-reload (requires 'air')
+make test          # Run tests
+make lint          # Run linter (requires golangci-lint)
+make format        # Format Go code
+
+# Utilities
+make check-deps    # Check if all dependencies are installed
+make status        # Show project build status
+make clean         # Clean build artifacts
 ```
 
 ## 🔧 Manual Setup
@@ -324,16 +377,82 @@ python3 auto_seeder.py --tracker http://YOUR_IP:8081 --status
 ollama-bt-lancache/
 ├── server/                 # Go web server
 │   ├── main.go            # Main server application
-│   └── go.mod             # Go dependencies
+│   ├── go.mod             # Go dependencies
+│   └── go.sum             # Go dependency checksums
 ├── tracker/               # BitTorrent tracker
-│   └── privtracker/       # meehow/privtracker
+│   ├── privtracker/       # meehow/privtracker (cloned)
+│   └── tracker            # Built tracker binary
 ├── client.py              # Python BitTorrent client (auto-seeding)
 ├── seeder.py              # Python seeding script
 ├── auto_seeder.py         # Automatic seeding manager
 ├── start_system.sh        # System startup script (dynamic IP)
 ├── stop_system.sh         # System shutdown script
+├── start_seeding.sh       # Start seeding only
+├── stop_seeding.sh        # Stop seeding only
 ├── install.sh             # Linux/macOS client installer
-└── README.md              # This file
+├── install.ps1            # Windows PowerShell installer
+├── requirements.txt       # Python dependencies
+├── Makefile              # Build and development commands
+├── go.mod                # Root Go module
+├── go.sum                # Root Go checksums
+└── README.md             # This file
+```
+
+## 🛠️ Development Workflow
+
+### First Time Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/jjasghar/ollama-bt-lancache.git
+cd ollama-bt-lancache
+
+# Setup Python environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Build everything
+make all
+
+# Verify setup
+make status
+```
+
+### Development Commands
+
+```bash
+# Check project status
+make status
+
+# Build and test
+make build
+make test
+
+# Format and lint code
+make format
+make lint
+
+# Development server with auto-reload
+make dev-server
+
+# Clean and rebuild
+make clean
+make all
+```
+
+### Testing the System
+
+```bash
+# Start the complete system
+./start_system.sh
+
+# Test install scripts (in another terminal)
+curl -sSL "http://YOUR_IP:8080/install.sh" | bash -s -- --list
+curl -sSL "http://YOUR_IP:8080/install.sh" | bash -s -- --test --model granite3.3:8b
+
+# Stop the system
+./stop_system.sh --clean
 ```
 
 ## 🤝 Contributing
@@ -341,7 +460,7 @@ ollama-bt-lancache/
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Test thoroughly using the development workflow
 5. Submit a pull request
 
 ## 📄 License
