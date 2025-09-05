@@ -230,6 +230,11 @@ setup_venv() {
         
         if ! command_exists python3; then
             print_error "Python 3 installation failed. Please install Python 3.8+ manually."
+            echo
+            print_info "You can download Python from: https://python.org/downloads/"
+            if [ -n "$SERVER_URL" ]; then
+                print_info "Or check if Python installer is available at: $SERVER_URL/downloads/"
+            fi
             exit 1
         fi
     fi
@@ -245,6 +250,11 @@ setup_venv() {
         
         if [ "$MAJOR" -lt 3 ] || ([ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 8 ]); then
             print_error "Python 3.8+ required. Found: $MAJOR.$MINOR"
+            echo
+            print_info "You can download Python from: https://python.org/downloads/"
+            if [ -n "$SERVER_URL" ]; then
+                print_info "Or check if Python installer is available at: $SERVER_URL/downloads/"
+            fi
             exit 1
         fi
     fi

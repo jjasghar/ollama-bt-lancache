@@ -87,7 +87,7 @@ fi
 
 # Start the BitTorrent tracker
 echo "📡 Starting BitTorrent tracker on port $TRACKER_PORT..."
-osascript -e "tell application \"Terminal\" to do script \"cd '$SCRIPT_DIR' && echo '📡 Starting BitTorrent Tracker...' && cd tracker/privtracker && PORT=$TRACKER_PORT ./tracker\""
+osascript -e "tell application \"Terminal\" to do script \"cd '$SCRIPT_DIR' && echo '📡 Starting BitTorrent Tracker...' && cd tracker && PORT=$TRACKER_PORT ./tracker\""
 
 # Give the tracker a moment to start
 sleep 3

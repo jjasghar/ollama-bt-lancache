@@ -229,6 +229,27 @@ curl -sSL "http://YOUR_SERVER_IP:8080/install.sh" | bash -s -- --list
 curl -sSL "http://YOUR_SERVER_IP:8080/install.sh" | bash -s -- --test --model <model-name>
 ```
 
+### Windows (PowerShell)
+
+**IMPORTANT: Before running any PowerShell commands, you must set the execution policy:**
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Then download and run the PowerShell script:**
+
+```powershell
+# List available models
+Invoke-WebRequest -Uri "http://YOUR_SERVER_IP:8080/install.ps1" -OutFile "install.ps1"; .\install.ps1 -List
+
+# Download a specific model
+Invoke-WebRequest -Uri "http://YOUR_SERVER_IP:8080/install.ps1" -OutFile "install.ps1"; .\install.ps1 -Model "granite3.3:8b"
+
+# Test mode (download to current directory)
+Invoke-WebRequest -Uri "http://YOUR_SERVER_IP:8080/install.ps1" -OutFile "install.ps1"; .\install.ps1 -Test -Model "granite3.3:8b"
+```
+
 ### Manual Client Usage
 
 ```bash

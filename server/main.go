@@ -110,9 +110,11 @@ func run(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to get local IP:", err)
 	}
 
-	// Set default tracker URL if not configured
+	// Set default tracker URL if not configured - use local privtracker
 	if !viper.IsSet("tracker_url") {
-		viper.Set("tracker_url", fmt.Sprintf("http://%s:8081/ollama/announce", localIP))
+		// Use local privtracker on port 1337 with hash-based room name
+		// Room name is SHA1 hash of "ollama" for proper privtracker compatibility
+		viper.Set("tracker_url", fmt.Sprintf("http://%s:1337/8ed4322e8e2790b8c928d381ce8d07cfd966e909/announce", localIP))
 	}
 
 	// Initialize server
@@ -472,10 +474,10 @@ func (s *Server) createModelSpecificTorrentFile(model *Model) (*TorrentFile, err
 			Pieces:      pieces,
 			Name:        "models", // Use "models" as the torrent name to match file structure
 			Files:       files,
-			Private:     1, // Private torrent
+			Private:     1, // Private torrent for local network distribution
 		}
 	
-	// Create torrent file
+	// Create torrent file for private tracker
 	torrent := &TorrentFile{
 		Announce:     s.trackerURL,
 		Comment:      fmt.Sprintf("Ollama model: %s", model.Name),
@@ -623,10 +625,10 @@ func (s *Server) createTorrentFile(modelPath, modelName string) (*TorrentFile, e
 		Pieces:      pieces,
 		Name:        "models", // Use "models" as the root name to match file structure
 		Files:       files,
-		Private:     1, // Private torrent
+		Private:     1, // Private torrent for local network distribution
 	}
 	
-	// Create torrent file
+	// Create torrent file for private tracker
 	torrent := &TorrentFile{
 		Announce:     s.trackerURL,
 		Comment:      fmt.Sprintf("Ollama models directory - %s", modelName),
@@ -1029,11 +1031,15 @@ func (s *Server) serveWebInterface(w http.ResponseWriter, r *http.Request) {
 
         <div class="install-scripts">
             <h2>🚀 Quick Installation</h2>
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+                <strong>📋 Requirements:</strong> Python 3.8+, Microsoft Visual C++ Redistributable (auto-installed), Administrator privileges<br>
+                <strong>⚠️ Note:</strong> If old Visual C++ versions are detected, they will be automatically removed and you'll need to restart PowerShell and run the script again.
+            </div>
             
             <div class="script-section">
                 <div class="script-title">📋 List Available Models</div>
                 <div class="script-code"># Windows (PowerShell)
-Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" | Invoke-Expression -ArgumentList "-List"
+Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" -OutFile "install.ps1"; .\install.ps1 -List
 
 # Linux/macOS (Bash)
 curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --list</div>
@@ -1042,7 +1048,7 @@ curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --list</div>
             <div class="script-section">
                 <div class="script-title">📥 Download Specific Model</div>
                 <div class="script-code"># Windows (PowerShell)
-Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" | Invoke-Expression -ArgumentList "-Model granite3.3:8b"
+Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" -OutFile "install.ps1"; .\install.ps1 -Model granite3.3:8b
 
 # Linux/macOS (Bash)
 curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --model granite3.3:8b</div>
@@ -1053,7 +1059,7 @@ curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --model grani
             <div class="script-section">
                 <div class="script-title">🧹 Clean Up Virtual Environment</div>
                 <div class="script-code"># Windows (PowerShell)
-Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" | Invoke-Expression -ArgumentList "-Clean"
+Invoke-WebRequest -Uri "http://{{.ServerIP}}:{{.Port}}/install.ps1" -OutFile "install.ps1"; .\install.ps1 -Clean
 
 # Linux/macOS (Bash)
 curl -sSL "http://{{.ServerIP}}:{{.Port}}/install.sh" | bash -s -- --clean</div>
